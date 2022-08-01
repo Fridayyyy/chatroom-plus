@@ -13,11 +13,14 @@
 #include "server.h"
 
 using namespace std;
+vector<bool> server::sock_arr(1000,false);
 server::server(int port, string ip):server_port(port),server_ip(ip){}
 
 server::~server() {
-    for (auto conn:sock_arr)
-        close(conn);
+    for (int i = 0; i < sock_arr.size(); ++i) {
+        if (sock_arr[i])
+            close(i);
+    }
     close(server_sockfd);
 }
 
@@ -56,10 +59,20 @@ void server::RecvMsg(int conn) {
     while (1){
         memset(buffer,0, sizeof(buffer));
         int len = recv(conn,buffer, sizeof(buffer),0);
-        if (strcmp(buffer,"exit")==0||len<0){
+        if (strcmp(buffer,"exit")==0||len<=0){
+
+            close(conn);
+            sock_arr[conn]=false;
             break;
         }
         cout<<"收到套接字描述符为"<<conn<<"发来的信息："<<buffer<<endl;
+        string ans = "收到";
+        int ret = send(conn,ans.c_str(),ans.length(),0);
+        if (ret<=0){
+            close(conn);
+            sock_arr = false;
+            break;
+        }
     }
 }
 
