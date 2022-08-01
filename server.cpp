@@ -16,9 +16,8 @@ using namespace std;
 server::server(int port, string ip):server_port(port),server_ip(ip){}
 
 server::~server() {
-    for (auto conn:sock_arr) {
+    for (auto conn:sock_arr)
         close(conn);
-    }
     close(server_sockfd);
 }
 
