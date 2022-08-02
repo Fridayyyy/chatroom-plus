@@ -51,3 +51,4 @@ void client::RecvMsg(int conn) {
         cout<<"收到服务器发来的信息："<<buffer<<endl;
     }
 }
+
