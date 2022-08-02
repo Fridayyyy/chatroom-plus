@@ -19,6 +19,7 @@ public:
     ~server();
     void run();
     static void RecvMsg(int conn);//子线程工作的静态函数
+    static void HandleRequest(int conn,string str);
 };
 
 #endif //CHATROOM_PLUS_SERVER_H

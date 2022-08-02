@@ -17,6 +17,7 @@ public:
     void run();
     static void SendMsg(int conn);
     static void RecvMsg(int conn);
+    void HandleClient(int conn);
 };
 
 #endif
