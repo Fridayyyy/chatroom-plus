@@ -13,6 +13,8 @@ private:
     int server_sockfd;//设为listen状态的套接字描述符
     string server_ip;
     static vector<bool> sock_arr;//保存所有套接字描述符
+    static unordered_map<string,int> name_sock_map;
+    static pthread_mutex_t name_sock_mutex;
 
 public:
     server(int port,string ip);

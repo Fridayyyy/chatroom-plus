@@ -30,12 +30,12 @@ void client::run() {
     return;
 }
 void client::SendMsg(int conn) {
-    char sendbuf[100];
     while (1){
-        memset(sendbuf,0, sizeof(sendbuf));
-        cin>>sendbuf;
-        int ret = send(conn, sendbuf, strlen(sendbuf),0);
-        if (strcmp(sendbuf,"exit")||ret<=0){
+        string str;
+        cin>>str;
+        str="content:"+str;
+        int ret = send(conn, str.c_str(), str.length(),0);
+        if (strcmp(sendbuf,"content:exit")||ret<=0){
             break;
         }
     }
@@ -49,19 +49,19 @@ void client::RecvMsg(int conn) {
         if (len<=0){
             break;
         }
-        cout<<"收到服务器发来的信息："<<buffer<<endl;
+        cout<<buffer<<endl;
     }
 }
 void client::HandleClient(int conn) {
     int choice;
-    string name,pass,pass1
+    string login_name,name;
+    bool if_login= false;
 
     cout<<" ------------------\n";
     cout<<"|                  |\n";
     cout<<"| 请输入你要的选项:|\n";
     cout<<"|    0:退出        |\n";
     cout<<"|    1:登录        |\n";
-    cout<<"|    2:注册        |\n";
     cout<<"|                  |\n";
     cout<<" ------------------ \n\n";
 
@@ -69,26 +69,56 @@ void client::HandleClient(int conn) {
         cin>>choice;
         if (choice==0){
             break;
-        } else if (choice==2){
-            cout<<"name: ";
+        }else if (choice==1&&!if_login){
+            cout<<"用户名：";
             cin>>name;
-            while (1){
-                cout<<"password: ";
-                cin>>pass;
-                cout<<"confirm password: ";
-                cin>>pass1;
-                if(pass==pass1)
-                    break;
-                else
-                    cout<<"两次密码不一致!\n\n";
-            }
-            name="name:"+name;
-            pass="pass:"+pass;
-            string str=name+pass;
-            send(conn,str.c_str(),str.length(),0);
-            cout<<"register successfully"<<endl;
-            cout<<"move on"<<endl;
+            string str="login"+name;
+            send(sock,str.c_str(),str.length(),0);
+            char buffer[1000];
+            memset(buffer,0, sizeof(buffer));
+            recv(sock,buffer, sizeof(buffer),0);
+            string recv_str(buffer);
+            if (recv_str.substr(0,3)=="wel"){
+                if_login = true;
+                login_name=name;
+                cout<<"登录成功"<<;
+                break;
+            } else
+                cout<<"登录失败"<<endl;
+
         }
     }
+
+    while (if_login){
+        if (if_login){
+            cout<<"        欢迎回来,"<<login_name<<endl;
+            cout<<" -------------------------------------------\n";
+            cout<<"|                                           |\n";
+            cout<<"|          请选择你要的选项：               |\n";
+            cout<<"|              0:退出                       |\n";
+            cout<<"|              1:发起单独聊天               |\n";
+            cout<<"|              2:发起群聊                   |\n";
+            cout<<"|                                           |\n";
+            cout<<" ------------------------------------------- \n\n";
+        }
+        cin>>choice;
+        if (choice==0){
+            break;
+        }
+        if (choice==1){
+            cout<<"请输入对面用户名：";
+            string target_name,content;
+            cin>>target_name;
+            string sendstr("target:"+target_name+"from"+login_name);
+
+            send(conn,sendstr.c_str(), sendstr.length(),0);
+            cout<<"请输入您想说的话（exit退出）：\n";
+            thread t1(client::SendMsg,conn);
+            thread t2(client::RecvMsg,conn);
+            t1.join();
+            t2.join();
+        }
+    }
+    close(sock)
 }
 
