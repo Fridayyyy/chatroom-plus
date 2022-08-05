@@ -118,7 +118,7 @@ void server::HandleRequest(int conn, string str,
             target_conn=name_sock_map[target];
         }
 
-    } else if (str.find("content:")!=str.nops){
+    } else if (str.find("content:")!=str.npos){
         if (target_conn==-1){
             cout<<"找不到目标用户"<<target_name<<"的套接字，将尝试重新寻找目标用户的套接字\n";
             if (name_sock_map.find(target_name)!=name_sock_map.end()){

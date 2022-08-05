@@ -34,7 +34,7 @@ void client::SendMsg(int conn) {
             str="gr_message:"+str;
         }
         int ret = send(abs(conn), str.c_str(), str.length(),0);
-        if (str=="content:exit")||ret<=0){
+        if (str=="content:exit"||ret<=0){
             break;
         }
     }
@@ -107,9 +107,9 @@ void client::HandleClient(int conn) {
             cout<<"请输入对面用户名：";
             string target_name,content;
             cin>>target_name;
-            string sendstr("target:"+target_name+"from"+login_name);
+            string sendstr("target:"+target_name+"from:"+login_name);
 
-            send(conn,sendstr.c_str(), sendstr.length(),0);
+            send(sock,sendstr.c_str(), sendstr.length(),0);
             cout<<"请输入您想说的话（exit退出）：\n";
             thread t1(client::SendMsg,conn);
             thread t2(client::RecvMsg,conn);
@@ -119,7 +119,7 @@ void client::HandleClient(int conn) {
             cout<<"请输入群号：";
             int num;
             cin>>num;
-            string sendstr("group"+ to_string(num));
+            string sendstr("group:"+ to_string(num));
             send(sock,sendstr.c_str(),sendstr.length(),0);
             cout<<"请输入你想说的话(输入exit退出)：\n";
             thread t1(client::SendMsg,-conn);
