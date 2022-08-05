@@ -23,9 +23,10 @@ public:
     server(int port,string ip);
     ~server();
     void run();
-    static void RecvMsg(int conn);//子线程工作的静态函数
-    static void HandleRequest(int conn,string str,
+    static void RecvMsg(int epollfd,int conn);//子线程工作的静态函数
+    static void HandleRequest(int epollfd,int conn,string str,
                               tuple<bool,string,string,int,int>&info);
+    static void setnonblocking(int conn);
 };
 
 #endif //CHATROOM_PLUS_SERVER_H
