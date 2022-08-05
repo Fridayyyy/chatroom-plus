@@ -21,12 +21,6 @@ void client::run() {
     cout<<"连接服务器成功\n";
     HandleClient(sock);
 
-    thread send_t(SendMsg,sock),recv_t(RecvMsg,sock);
-    send_t.join();
-    cout<<"发送线程已结束\n";
-
-    recv_t.join();
-    cout<<"接收线程已结束\n";
     return;
 }
 void client::SendMsg(int conn) {
