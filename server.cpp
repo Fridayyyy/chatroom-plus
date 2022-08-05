@@ -16,6 +16,8 @@ using namespace std;
 vector<bool> server::sock_arr(1000,false);
 unordered_map<string,int> server::name_sock_map;
 pthread_mutex_t server::name_sock_mutex;
+pthread_mutex_t server::group_mutx;
+unordered_map<int,set<int>> server::group_map;
 
 server::server(int port, string ip):server_port(port),server_ip(ip){
     pthread_mutex_init(&name_sock_mutex,NULL);
@@ -61,7 +63,7 @@ void server::run(){
 }
 void server::RecvMsg(int conn) {
     //if_login,login_name,target_name,target_conn
-    tuple<bool,string,string,int> info;
+    tuple<bool,string,string,int,int> info;
 
     get<0>(info)=false;
     get<3>(info)=-1;
@@ -83,7 +85,7 @@ void server::RecvMsg(int conn) {
     }
 }
 void server::HandleRequest(int conn, string str,
-                           tuple<bool,string,string,int> &info) {
+                           tuple<bool,string,string,int,int> &info) {
     char buffer[1000];
     string name,pass;
 
@@ -91,6 +93,7 @@ void server::HandleRequest(int conn, string str,
     string login_name=get<1>(info);
     string target_name=get<2>(info);
     int target_conn=get<3>(info);
+    int group_num=get<4>(info);
 
     if (str.find("login")!=str.npos){
         int p1=str.find("login"),p2=str.find("end");
@@ -134,10 +137,32 @@ void server::HandleRequest(int conn, string str,
 
         send(target_conn,send_str.c_str(),send_str.length(),0);
 
+    } else if (str.find("group:")!=str.npos){
+        string recv_str(str);
+        string num_str= recv_str.substr(6);
+        group_num= stoi(num_str);
+        cout<<"用户"<<login_name<<"绑定群聊号为："<<num_str<<endl;
+
+        pthread_mutex_lock(&group_mutx);
+        group_map[group_num].insert(conn);
+        pthread_mutex_unlock(&group_mutx);
+    } else if (str.find("gr_message:")!=str.npos){
+        string send_str(str);
+        send_str=send_str.substr(11);
+        send_str="["+login_name+"]:"+send_str;
+        cout<<"群聊信息："<<send_str<<endl;
+
+        for (auto i:group_map[group_num]) {
+            if (i!=conn)
+                send(i,send_str.c_str(),send_str.length(),0);
+        }
     }
+
     get<0>(info)=if_login;//记录当前服务对象是否成功登录
     get<1>(info)=login_name;//记录当前服务对象的名字
     get<2>(info)=target_name;//记录目标对象的名字
     get<3>(info)=target_conn;//目标对象的套接字描述符
+    get<4>(info)=group_num;
+
 }
 

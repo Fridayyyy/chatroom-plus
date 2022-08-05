@@ -33,9 +33,14 @@ void client::SendMsg(int conn) {
     while (1){
         string str;
         cin>>str;
-        str="content:"+str;
-        int ret = send(conn, str.c_str(), str.length(),0);
-        if (strcmp(sendbuf,"content:exit")||ret<=0){
+
+        if (conn>0){
+            str="content:"+str;
+        } else if (conn<0){
+            str="gr_message:"+str;
+        }
+        int ret = send(abs(conn), str.c_str(), str.length(),0);
+        if (str=="content:exit")||ret<=0){
             break;
         }
     }
@@ -81,7 +86,7 @@ void client::HandleClient(int conn) {
             if (recv_str.substr(0,3)=="wel"){
                 if_login = true;
                 login_name=name;
-                cout<<"登录成功"<<;
+                cout<<"登录成功"<<endl;
                 break;
             } else
                 cout<<"登录失败"<<endl;
@@ -104,8 +109,7 @@ void client::HandleClient(int conn) {
         cin>>choice;
         if (choice==0){
             break;
-        }
-        if (choice==1){
+        } else if (choice==1){
             cout<<"请输入对面用户名：";
             string target_name,content;
             cin>>target_name;
@@ -117,8 +121,20 @@ void client::HandleClient(int conn) {
             thread t2(client::RecvMsg,conn);
             t1.join();
             t2.join();
+        } else if (choice==2){
+            cout<<"请输入群号：";
+            int num;
+            cin>>num;
+            string sendstr("group"+ to_string(num));
+            send(sock,sendstr.c_str(),sendstr.length(),0);
+            cout<<"请输入你想说的话(输入exit退出)：\n";
+            thread t1(client::SendMsg,-conn);
+            thread t2(client::RecvMsg,conn);
+            t1.join();
+            t2.join();
+
         }
     }
-    close(sock)
+    close(sock);
 }
 
