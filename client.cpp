@@ -18,7 +18,7 @@ void client::run() {
         perror("connect");
         exit(1);
     }
-    cout<<"连接服务器成功\n";
+    cout<<"连接服务器成功"<<endl;
     HandleClient(sock);
 
     return;
@@ -73,9 +73,11 @@ void client::HandleClient(int conn) {
             cin>>name;
             string str="login"+name;
             send(sock,str.c_str(),str.length(),0);
+
             char buffer[1000];
             memset(buffer,0, sizeof(buffer));
             recv(sock,buffer, sizeof(buffer),0);
+
             string recv_str(buffer);
             if (recv_str.substr(0,3)=="wel"){
                 if_login = true;
@@ -100,6 +102,8 @@ void client::HandleClient(int conn) {
             cout<<"|                                           |\n";
             cout<<" ------------------------------------------- \n\n";
         }
+
+
         cin>>choice;
         if (choice==0){
             break;

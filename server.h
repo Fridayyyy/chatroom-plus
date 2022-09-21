@@ -10,7 +10,7 @@
 class server{
 private:
     int server_port;
-    int server_sockfd;//设为listen状态的套接字描述符
+    int server_sockfd;
     string server_ip;
     static vector<bool> sock_arr;//保存所有套接字描述符
     static unordered_map<string,int> name_sock_map;
@@ -23,7 +23,7 @@ public:
     server(int port,string ip);
     ~server();
     void run();
-    static void RecvMsg(int epollfd,int conn);//子线程工作的静态函数
+    static void RecvMsg(int epollfd,int conn);
     static void HandleRequest(int epollfd,int conn,string str,
                               tuple<bool,string,string,int,int>&info);
     static void setnonblocking(int conn);

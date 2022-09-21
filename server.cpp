@@ -40,26 +40,31 @@ void server::run(){
     epfd=epoll_create(10000);
     struct sockaddr_in clientaddr;
     struct sockaddr_in serveraddr;
+
     listenfd = socket(PF_INET,SOCK_STREAM,0);
     setnonblocking(listenfd);
     ev.data.fd=listenfd;
     ev.events=EPOLLIN|EPOLLET;
     epoll_ctl(epfd,EPOLL_CTL_ADD,listenfd,&ev);
+
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");//此处设为服务器的ip
+    serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     serveraddr.sin_port=htons(8023);
+
     bind(listenfd,(struct sockaddr *)&serveraddr, sizeof(serveraddr));
     listen(listenfd,LISTENQ);
     clilen=sizeof(clientaddr);
     maxi=0;
+
+    boost::asio::thread_pool tp(10);
 
     while (1){
         cout<<"--------------------------"<<endl;
         cout<<"epoll_wait阻塞中"<<endl;
         //等待epoll事件的发生
         nfds=epoll_wait(epfd,events,10000,-1);
-        cout<<"epoll_wait返回，有事件发生"<<endl;
+        cout<<"epoll_wait返回"<<endl;
 
         for (int i = 0; i < nfds; ++i) {
             if (events[i].data.fd==listenfd){
@@ -77,6 +82,7 @@ void server::run(){
                 epoll_ctl(epfd,EPOLL_CTL_ADD,connfd,&ev);
 
             }else if(events[i].events&EPOLLIN){
+                cout<<"events:"<<events[i].events<<" epollin:"<<EPOLLIN<<" e&E"<<events[i].events&EPOLLIN<<endl;
                 sockfd=events[i].data.fd;
                 events[i].data.fd=-1;
 
@@ -91,7 +97,10 @@ void server::run(){
 
 }
 void server::RecvMsg(int epollfd,int conn) {
-    //if_login,login_name,target_name,target_conn
+    //if_login,
+    // login_name,
+    // target_name,
+    // target_conn
     tuple<bool,string,string,int,int> info;
 
     get<0>(info)=false;
@@ -106,7 +115,7 @@ void server::RecvMsg(int epollfd,int conn) {
 
         if (ret<0){
             cout<<"recv返回值小于0"<<endl;
-            //对于非阻塞IO，下面的事件成立标识数据已经全部读取完毕
+
             if((errno == EAGAIN) || (errno == EWOULDBLOCK)){
                 printf("数据读取完毕\n");
                 cout<<"接收到的完整内容为："<<recv_str<<endl;
@@ -130,7 +139,7 @@ void server::RecvMsg(int epollfd,int conn) {
 void server::HandleRequest(int epollfd,int conn, string str,
                            tuple<bool,string,string,int,int> &info) {
     char buffer[1000];
-    string name,pass;
+    string name;
 
     bool if_login=get<0>(info);
     string login_name=get<1>(info);
@@ -143,9 +152,11 @@ void server::HandleRequest(int epollfd,int conn, string str,
         name = str.substr(p1+5,p2-3);
         login_name=name;
         if_login= true;
+
         pthread_mutex_lock(&name_sock_mutex);
         name_sock_map[login_name]=conn;
         pthread_mutex_unlock(&name_sock_mutex);
+
         string str1("welcome,"+login_name);
         send(conn,str1.c_str(),str1.length(),0);
 
@@ -153,6 +164,7 @@ void server::HandleRequest(int epollfd,int conn, string str,
         int pos1=str.find("from");
         string target=str.substr(7,pos1-7),from=str.substr(pos1+4);
         target_name=target;
+
         if (name_sock_map.find(target)==name_sock_map.end())
             cout<<"源用户为:"<<login_name<<",目标用户："<<target_name<<" 仍未登录";
         else{
@@ -201,6 +213,7 @@ void server::HandleRequest(int epollfd,int conn, string str,
         }
     }
 
+    //事件类型会被清空
     epoll_event event;
     event.data.fd=conn;
     event.events=EPOLLIN|EPOLLET|EPOLLONESHOT;
