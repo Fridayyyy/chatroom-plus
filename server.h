@@ -16,6 +16,9 @@ private:
     static unordered_map<string,int> name_sock_map;
     static pthread_mutex_t name_sock_mutex;
 
+    static unordered_map<string,string> from_to_map;
+    static pthread_mutex_t from_mutex;
+
     static unordered_map<int,set<int>> group_map;
     static pthread_mutex_t group_mutx;
 

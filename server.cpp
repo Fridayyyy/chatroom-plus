@@ -10,6 +10,7 @@
 #include <sys/shm.h>
 #include <iostream>
 
+
 #include "server.h"
 
 using namespace std;
@@ -18,9 +19,13 @@ unordered_map<string,int> server::name_sock_map;
 pthread_mutex_t server::name_sock_mutex;
 pthread_mutex_t server::group_mutx;
 unordered_map<int,set<int>> server::group_map;
+unordered_map<string,string> server::from_to_map;
+pthread_mutex_t server::from_mutex;
 
 server::server(int port, string ip):server_port(port),server_ip(ip){
     pthread_mutex_init(&name_sock_mutex,NULL);
+    pthread_mutex_init(&from_mutex,NULL);
+    pthread_mutex_init(&group_mutx,NULL);
 }
 
 server::~server() {
@@ -57,7 +62,6 @@ void server::run(){
     clilen=sizeof(clientaddr);
     maxi=0;
 
-    boost::asio::thread_pool tp(10);
 
     while (1){
         cout<<"--------------------------"<<endl;
@@ -68,13 +72,13 @@ void server::run(){
 
         for (int i = 0; i < nfds; ++i) {
             if (events[i].data.fd==listenfd){
-                connfd = accept(listenfd,(sockaddr *)&clientaddr,clilen);
+                connfd = accept(listenfd,(sockaddr *)&clientaddr,(socklen_t*)&clilen);
                 if(connfd<0){
                     perror("connfd<0");
                     exit(1);
                 }
                 else{
-                    cout<<"用户"<<inet_ntoa(clientaddr.sin_addr)<<"正在连接\n";
+                    cout<<"用户"<<inet_ntoa(clientaddr.sin_addr)<<"正在连接,fd:"<<connfd<<endl;
                 }
                 ev.data.fd=connfd;
                 ev.events=EPOLLIN|EPOLLET|EPOLLONESHOT;
@@ -82,14 +86,18 @@ void server::run(){
                 epoll_ctl(epfd,EPOLL_CTL_ADD,connfd,&ev);
 
             }else if(events[i].events&EPOLLIN){
-                cout<<"events:"<<events[i].events<<" epollin:"<<EPOLLIN<<" e&E"<<events[i].events&EPOLLIN<<endl;
+                cout<<"events:"<<events[i].events<<" epollin:"<<EPOLLIN;
                 sockfd=events[i].data.fd;
                 events[i].data.fd=-1;
 
-                cout<<"接收到读事件"<<endl;
+                cout<<"接收到读事件,fd:"<<sockfd<<endl;
+
 
                 string recv_str;
-                boost::asio::post(boost::bind(RecvMsg,epfd,sockfd));
+                //RecvMsg(epfd,sockfd);
+                thread t(server::RecvMsg,epfd,sockfd);
+                t.detach();
+
             }
         }
     }
@@ -97,7 +105,7 @@ void server::run(){
 
 }
 void server::RecvMsg(int epollfd,int conn) {
-    //if_login,
+    // if_login,
     // login_name,
     // target_name,
     // target_conn
@@ -162,20 +170,35 @@ void server::HandleRequest(int epollfd,int conn, string str,
 
     }else if (str.find("target:")!=str.npos){
         int pos1=str.find("from");
-        string target=str.substr(7,pos1-7),from=str.substr(pos1+4);
+        string target=str.substr(7,pos1-7),from=str.substr(pos1+5);
         target_name=target;
 
         if (name_sock_map.find(target)==name_sock_map.end())
-            cout<<"源用户为:"<<login_name<<",目标用户："<<target_name<<" 仍未登录";
+            cout<<"源用户为:"<<from<<",目标用户："<<target_name<<" 仍未登录";
         else{
-            cout<<"源用户"<<login_name<<"向目标用户"<<target_name<<"发起的私聊即将建立";
-            cout<<",目标用户的套接字描述符为"<<name_sock_map[target]<<endl;
-            target_conn=name_sock_map[target];
+            pthread_mutex_lock(&from_mutex);
+            from_to_map[from]=target_name;
+            pthread_mutex_unlock(&from_mutex);
+
+            cout<<"源用户:"<<from<<"向目标用户:"<<target_name<<" 发起的私聊即将建立";
+            cout<<",目标用户的套接字描述符为:"<<name_sock_map[target_name]<<endl;
+            target_conn=name_sock_map[target_name];
+            cout<<"target_conn:"<<target_conn<<endl;
         }
 
     } else if (str.find("content:")!=str.npos){
+        target_conn=-1;
+
+        for(auto i:name_sock_map){
+            if(i.second==conn){
+                login_name=i.first;
+                target_name=from_to_map[i.first];
+                target_conn=name_sock_map[target_name];
+                break;
+            }
+        }
         if (target_conn==-1){
-            cout<<"找不到目标用户"<<target_name<<"的套接字，将尝试重新寻找目标用户的套接字\n";
+            cout<<"找不到目标用户:"<<target_name<<" 的套接字，将尝试重新寻找目标用户的套接字\n";
             if (name_sock_map.find(target_name)!=name_sock_map.end()){
                 target_conn=name_sock_map[target_name];
                 cout<<"重新查找目标用户套接字成功\n";
@@ -187,7 +210,7 @@ void server::HandleRequest(int epollfd,int conn, string str,
         }
         string recv_str(str);
         string send_str=recv_str.substr(8);
-        cout<<"用户"<<login_name<<"向"<<target_name<<"发送:"<<send_str<<endl;
+        cout<<"用户:"<<login_name<<" 向 "<<target_name<<"发送:"<<send_str<<endl;
         send_str="["+login_name+"]:"+send_str;
 
         send(target_conn,send_str.c_str(),send_str.length(),0);
@@ -196,16 +219,44 @@ void server::HandleRequest(int epollfd,int conn, string str,
         string recv_str(str);
         string num_str= recv_str.substr(6);
         group_num= stoi(num_str);
-        cout<<"用户"<<login_name<<"绑定群聊号为："<<num_str<<endl;
+
+        for (auto i:name_sock_map)
+        {
+            if (i.second==conn)
+            {
+                login_name==i.first;
+                break;
+            }
+
+        }
+
+
+        cout<<"用户:"<<login_name<<"绑定群聊号为："<<num_str<<endl;
 
         pthread_mutex_lock(&group_mutx);
         group_map[group_num].insert(conn);
         pthread_mutex_unlock(&group_mutx);
     } else if (str.find("gr_message:")!=str.npos){
+
+        for(auto i:name_sock_map)
+            if(i.second==conn){
+                login_name=i.first;
+                break;
+            }
+        for(auto i:group_map){
+            if (i.second.find(conn)!=i.second.end())
+            {
+                group_num=i.first;
+                break;
+            }
+
+        }
+
         string send_str(str);
         send_str=send_str.substr(11);
         send_str="["+login_name+"]:"+send_str;
         cout<<"群聊信息："<<send_str<<endl;
+
 
         for (auto i:group_map[group_num]) {
             if (i!=conn)
@@ -241,4 +292,3 @@ void server::setnonblocking(int sock){
         exit(1);
     }
 }
-
